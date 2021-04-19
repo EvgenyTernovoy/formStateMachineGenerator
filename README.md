@@ -1,70 +1,204 @@
-# Getting Started with Create React App
+# Form machine generator
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Helper for creating forms using [XState machine](https://xstate.js.org/docs/guides/machines.html)
 
-## Available Scripts
+- [Описание реализованнго функцианала](#описание-реализованнго-функцианала)
+- [Недостатки и ограничения подхода](#недостатки-и-ограничения-подхода)
+- [Почему было выбрано именно такое внешнее API](#Почему-было-выбрано-именно-такое-внешнее-API)
+- [Альтернативные варианты реализации](#Альтернативные-варианты-реализации)
+- [Example](#example)
+- [API](#api)
+- [Config description](#config-description)
+  - [Config](#config)
+  - [Field config](#field-config)
+  - [Field validations](#field-validations)
+  - [Validation](#validations)
 
-In the project directory, you can run:
 
-### `yarn start`
+## Описание реализованнго функцианала
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+  В предоставленном генераторе XState машины реализован следующий функционал:
+  - синхронная валидация одного поля выполняющаяся при вводе данных в поле.
+  - синхронная валидация всей формы, ошибка присваивается конкретному полю. 
+    Валидация происходит полсе нажатия на кнопку submit.
+  - асинхронная валидация всей формы, ошибка присваивается конкретному полю.
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+## Недостатки и ограничения подхода
 
-### `yarn test`
+  - Нельзя расширить конфиг стейт машины
+  - Нет возможности управлять состоянием машины напрямую.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Почему было выбрано именно такое внешнее API
+  
+  API содержит всего один метод, что очень легко для восприятия.
+  Декларативное описание конфига позволяет удобно пистать, читать и рефакторить его в дальнейшем.
+  На выходе мы получаем все нужные функции для работы с формой связанной с XState машиной, скрывая сложность.
 
-### `yarn build`
+## Альтернативные варианты реализации
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+  Рассматривался вариант конструирования конфига с помощю API. Сам конфиг находится в пользовтельском файле, 
+  и создается вручную, путем вызова вспомогательных функций. 
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+  Данный подход позволил бы более гибко описывать конфигурцию XState машины, но и привнес бы большую сложность.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## Example
 
-### `yarn eject`
+```js
+    import {createFormMachine} from './machines/createFormMachine'
+    import {useMachine} from "@xstate/react"
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+    const emailConfig = {
+      name: 'email',
+      validations: {
+        onInput: [
+          {name: 'isNotEmail', fn: (ctx, event) => !ctx.email.value.includes('@'), message: 'It is not an email'}
+        ],
+        onSubmit: [
+          {name: 'empty', fn: (ctx, event) => !ctx.email.value, message: 'Email should be filled'},
+        ]
+      }
+    }
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+    const config = {
+      formName: 'test',
+      fields: [emailConfig, passwordConfig, repeatPasswordConfig],
+      submit: async (ctx, event) => new Promise((resolve, reject) => {
+        if (ctx.email.value === 'test@test.com') {
+          reject({ status: 'error', messages: { email: 'User already exist'} })
+        }
+    
+        resolve({ status: 'success'})
+      }),
+      prepareAsyncErrors: (ctx, event) => event.data.messages,
+    }
+    
+    // create machine
+    const { machine, submit, email } = createFormMachine(config)
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+    function App() {
+      const [formState, send] = useMachine(machine)
+      const {context} = formState
+    
+      const onSubmit = e => submit(send, e)
+    
+      return (
+        <div className="App">
+          <header className="App-header">
+            <form className="form">
+              <label className="input-label">
+                Email:
+                <input className="input" type="text" value={context.email.value} onInput={e => email.onInput(send, e)}/>
+              </label>
+              {context.email.error &&
+              <div className="error">
+                {context.email.error}
+              </div>
+              }
+              <button onClick={onSubmit}>Submit</button>
+            </form>
+            {formState.matches('success') &&
+            <div className="success">
+              Success
+            </div>
+            }
+          </header>
+        </div>
+      )
+    }
 
-## Learn More
+    export default App
+  ```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## API
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+### `createFormMachine(config)`
 
-### Code Splitting
+Function that return the machine and support methods for fields and form.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+**Arguments**
 
-### Analyzing the Bundle Size
+- `config` - is an object which describe the `fields` and the form behavior
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+  ```js
+    // describe config
+    const emailConfig = {
+      name: 'email',
+      validations: {}
+    }
+    
+    const config = {
+      formName: 'test',
+      fields: [emailConfig],
+      submit: async (ctx, event) => {},
+      prepareAsyncErrors: (ctx, event) => event.data.messages,
+      debug: true,
+    }
+    
+    // create machine
+    const { machine, submit, email } = createFormMachine(config)
+  ```
 
-### Making a Progressive Web App
+**Returns** an object `{ machine, submit, email //additional fields...}`:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+- `machine` - An [XState machine](https://xstate.js.org/docs/guides/machines.html).
+- `submit` - A function that create event for form sending.
+- `email` - The `field` API. The name will be the same as name in config.
+  - `onInput` - A function that create event for field input. The function has two arguments:
+    
+    `send` - is function which sends events to the running machine
+    
+    `event` - is the input event.
+    ```js
+    // react example
+    <input type="text" onInput={event => email.onInput(send, event)}/>
+    ```
+## Config description
 
-### Advanced Configuration
+### `Config`
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+Config is a simple object where you describe your form behavior. The config includes:
 
-### Deployment
+- `formName` - Name of the form.
+- `fields` - Array of form field configs.
+- `submit` - Function for submit request. You can extend `machine` with `submit` service instead. Receives the machine `context` and `event` as arguments.
+- `prepareAsyncErrors` - Function that prepare submit error for `machine`. Receives the machine `context` and `event` as arguments.
+- `debug` - If ```true``` write `machine` config to the console.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+### `Field config`
 
-### `yarn build` fails to minify
+Field config is a simple object where you describe your field behavior. The config includes:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- `name` - Name of the field.
+- `validations` - Array of `validations`.
+
+### `Field validations`
+
+Validations describe how to validate form fields.
+You can describe two types of validations `onInput`, `onSubmit`.
+
+- `onInput` - Runs on each input for a specific field.
+- `onSubmit` - Runs synchronously for each field after clicking submit button.
+
+  ```js
+    {
+      //...,
+      validations: {
+        onInput: [
+          {name: 'isNotEmail', fn: (ctx, event) => !ctx.email.value.includes('@'), message: 'It is not an email'}
+        ],
+        onSubmit: [
+          {name: 'empty', fn: (ctx, event) => !ctx.email.value, message: 'Email should be filled'},
+        ]
+      }
+    }
+  ```
+
+### `Validation`
+
+Validation is a function that describe how to validate the value of the field.
+
+- `name` - Validation name.
+- `fn` - Function for validation. The Function receives the machine `context` and `event` as arguments.
+- `message` - Error message if validation failed.
+

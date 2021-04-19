@@ -43,8 +43,21 @@
   align-items: center;
 }
 
+.input-label {
+  font-size: 16px;
+}
+
+.input {
+  margin-left: 10px;
+  margin-bottom: 15px;
+}
+
 .error {
   font-size: 13px;
   color: red;
-  margin-top: 10px;
+  margin: 3px 0;
+}
+
+.success {
+  margin-top: 15px;
 }

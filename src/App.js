@@ -1,86 +1,94 @@
 import './App.css'
-import {createFormMachine} from './machines/createFormMachine'
+import {createFormMachine} from '../formMachineGenerator/index'
 import {useMachine} from "@xstate/react"
 
 
-const email = {
+const emailConfig = {
   name: 'email',
-  validations: [
-    {name: 'empty', fn: (ctx, event) => !ctx.email.value, message: 'Email should be filled'},
-    {name: 'isNotEmail', fn: (ctx, event) => !ctx.email.value.includes('@'), message: 'It is not an email'}
-  ]
+  validations: {
+    onInput: [
+      {name: 'isNotEmail', fn: (ctx, event) => !ctx.email.value.includes('@'), message: 'It is not an email'}
+    ],
+    onSubmit: [
+      {name: 'empty', fn: (ctx, event) => !ctx.email.value, message: 'Email should be filled'},
+    ]
+  }
 }
 
-const password = {
+const passwordConfig = {
   name: 'password',
-  validations: [
-    {name: 'tooShort', fn: (ctx, event) => ctx.password.value.length < 6, message: 'Password too short'},
-  ]
+  validations: {
+    onInput: [
+      {name: 'tooShort', fn: (ctx, event) => ctx.password.value.length < 6, message: 'Password too short'},
+    ],
+    onSubmit: [
+      {name: 'empty', fn: (ctx, event) => !ctx.password.value, message: 'Password should be filled'},
+    ]
+  }
 }
 
-const repeatPassword = {
+const repeatPasswordConfig = {
   name: 'repeatPassword',
-  validations: [
-    {name: 'passwordMismatch', fn: (ctx, event) => ctx.password.value !== ctx.repeatPassword.value, message: 'Password mismatch'},
-  ]
+  validations: {
+    onSubmit: [
+      {
+        name: 'passwordMismatch',
+        fn: (ctx, event) => ctx.password.value !== ctx.repeatPassword.value,
+        message: 'Password mismatch'
+      }
+    ]
+  }
 }
 
 const config = {
   formName: 'test',
-  fields: [email, password, repeatPassword],
+  fields: [emailConfig, passwordConfig, repeatPasswordConfig],
+  submit: async (ctx, event) => new Promise((resolve, reject) => {
+    if (ctx.email.value === 'test@test.com') {
+      reject({ status: 'error', messages: { email: 'User already exist'} })
+    }
+
+    resolve({ status: 'success'})
+  }),
+  prepareAsyncErrors: (ctx, event) => event.data.messages,
+  debug: true,
 }
 
-const machine = createFormMachine(config)
+const { machine, email, password, repeatPassword, submit } = createFormMachine(config)
 
 function App() {
+
   const [formState, send] = useMachine(machine)
 
   const {context} = formState
 
-  const onInput = (e) => {
-    send({type: "SET_EMAIL", email: e.target.value})
-  }
-
-  const onInputPassword = (e) => {
-    send({type: "SET_PASSWORD", password: e.target.value})
-  }
-
-  const onInputRepeatPassword = (e) => {
-    send({type: "SET_REPEAT_PASSWORD", repeatPassword: e.target.value})
-  }
-
-  const onSubmit = (e) => {
-    e.preventDefault()
-    send('SUBMIT')
-  }
-
-  console.log('---formState', formState)
+  const onSubmit = e => submit(send, e)
 
   return (
     <div className="App">
       <header className="App-header">
         <form className="form">
-          <label>
+          <label className="input-label">
             Email:
-            <input type="text" value={context.email.value} onInput={onInput}/>
+            <input className="input" type="text" value={context.email.value} onInput={e => email.onInput(send, e)}/>
           </label>
           {context.email.error &&
-            <div className="error">
-              {context.email.error}
-            </div>
+          <div className="error">
+            {context.email.error}
+          </div>
           }
-          <label>
+          <label className="input-label">
             Password:
-            <input type="text" value={context.password.value} onInput={onInputPassword}/>
+            <input className="input" type="text" value={context.password.value} onInput={e => password.onInput(send, e)}/>
           </label>
           {context.password.error &&
           <div className="error">
             {context.password.error}
           </div>
           }
-          <label>
+          <label className="input-label">
             Repeat password:
-            <input type="text" value={context.repeatPassword.value} onInput={onInputRepeatPassword}/>
+            <input className="input" type="text" value={context.repeatPassword.value} onInput={e => repeatPassword.onInput(send, e)}/>
           </label>
           {context.repeatPassword.error &&
           <div className="error">
@@ -89,6 +97,11 @@ function App() {
           }
           <button onClick={onSubmit}>Submit</button>
         </form>
+        {formState.matches('success') &&
+        <div className="success">
+          Success
+        </div>
+        }
       </header>
     </div>
   )
