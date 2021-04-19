@@ -62,7 +62,7 @@ Helper for creating forms using [XState machine](https://xstate.js.org/docs/guid
 
     const config = {
       formName: 'test',
-      fields: [emailConfig, passwordConfig, repeatPasswordConfig],
+      fields: [emailConfig],
       submit: async (ctx, event) => new Promise((resolve, reject) => {
         if (ctx.email.value === 'test@test.com') {
           reject({ status: 'error', messages: { email: 'User already exist'} })

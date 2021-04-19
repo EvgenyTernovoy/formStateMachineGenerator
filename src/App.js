@@ -1,5 +1,5 @@
 import './App.css'
-import {createFormMachine} from '../formMachineGenerator/index'
+import {createFormMachine} from './formMachineGenerator/index'
 import {useMachine} from "@xstate/react"
 
 
